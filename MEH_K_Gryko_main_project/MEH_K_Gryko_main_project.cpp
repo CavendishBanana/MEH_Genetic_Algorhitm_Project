@@ -8,9 +8,9 @@
 using namespace std;
 
 
-int getTargetFunValueNoHalf(int** matrix, unsigned int matrixSize)
+int getTargetFunValueNoHalf(long int** matrix, unsigned int matrixSize)
 {
-    cout << "main: target function begin" << endl;
+    //cout << "main: target function begin" << endl;
     int totalSum = 0;
     for (int i = 0; i < matrixSize; i++)
     {
@@ -36,9 +36,9 @@ int getTargetFunValueNoHalf(int** matrix, unsigned int matrixSize)
 
             totalSum += (matrix[i][j] * localSum);
         }
-        cout << "total sum for i = " << i << ": " << totalSum << endl;
+        //cout << "total sum for i = " << i << ": " << totalSum << endl;
     }
-    cout << "main: target function done" << endl;
+    //cout << "main: target function done" << endl;
     return totalSum;
 }
 
@@ -62,7 +62,7 @@ if (i - 1u >= 0u && j - 1u >= 0u)
 
 */
 
-double getTargetFunValueHalf(int** matrix, unsigned int matrixSize)
+double getTargetFunValueHalf(long int** matrix, unsigned int matrixSize)
 {
     int totalSum = 0;
     for (unsigned int i = 0; i < matrixSize; i++)
@@ -94,7 +94,7 @@ double getTargetFunValueHalf(int** matrix, unsigned int matrixSize)
     return static_cast<double>(totalSum)*0.5;
 }
 
-void printMatrix(int** matrix, unsigned int matrixSize)
+void printMatrix(long int** matrix, unsigned int matrixSize)
 {
     for (unsigned int i = 0; i < matrixSize; i++)
     {
@@ -112,26 +112,15 @@ void printMatrix(int** matrix, unsigned int matrixSize)
 
 int main()
 {
-    unsigned int a = 8u;
-    unsigned int b = a >> 1;
-    unsigned int c = a >> 2;
-    cout << "a: " << a << " b: "<<b<<" c: "<<c<<endl;
-    unsigned int x = 1u;
-    x = x - 10u;
-    cout << "x: "<<x << endl;
-    unsigned int x2 = numeric_limits<unsigned int>::max();
-    x2 = x2 + 5u;
-    cout << "x2: " << x2 << endl;
-    
 
     default_random_engine engine;
     uniform_int_distribution<int> distribution = uniform_int_distribution<int>(-100, 100);
 
-    unsigned int matrixSize = 7;
-    int** matrix = new int* [matrixSize];
+    unsigned int matrixSize = 30;
+    long int** matrix = new long int* [matrixSize];
     for (unsigned int i = 0; i < matrixSize; i++)
     {
-        matrix[i] = new int[matrixSize];
+        matrix[i] = new long int[matrixSize];
         for (unsigned int j = 0; j < matrixSize; j++)
         {
             matrix[i][j] = distribution(engine);
@@ -141,18 +130,25 @@ int main()
 
     printMatrix(matrix, matrixSize);
     
-    int startingTargetValue = getTargetFunValueNoHalf(matrix, matrixSize);
+    MatrixGeneticAlgorithm<unsigned short, long int> geneticAlgorithmSolver = MatrixGeneticAlgorithm<unsigned short, long int>(matrix, matrixSize, 2.0, 20.0, 3.0, 2.0, engine, 0.95, 0.07, 4);
+    
+    double startingTargetValue = geneticAlgorithmSolver.getTargetFunctionValueForPassedMatrix(matrix);
     cout << "Target value before optimization: " << startingTargetValue << endl;
+    
+    unsigned int generationsCount = 20000;
+    geneticAlgorithmSolver.solveWithNGenerations(generationsCount, true);
 
-    MatrixGeneticAlgorithm<unsigned short, int> geneticAlgorithmSolver = MatrixGeneticAlgorithm<unsigned short, int>(matrix, matrixSize, 2.0, 100.0, 3.0, 3.0, engine, 0.95, 0.07, 4);
-    geneticAlgorithmSolver.solveWithNGenerations(10000, true);
-
-    int** optimizedMatrix = geneticAlgorithmSolver.getCurrentBestSolution();
-    int targetValueAfterOptimization = getTargetFunValueNoHalf(optimizedMatrix, matrixSize);
+    long int** optimizedMatrix = geneticAlgorithmSolver.getCurrentBestSolution();
+    double currentBestSolutionFromSolver = geneticAlgorithmSolver.getCurrentBestSolutionTargetFunctionValue();
+    double fastCurrentBestSolutionFromSover = geneticAlgorithmSolver.getCurrentBestSolutionTargetFunctionValue();
+    cout << "best solution target function value from solver: " << currentBestSolutionFromSolver << endl;
+    double targetValueAfterOptimization = static_cast<double>(getTargetFunValueNoHalf(optimizedMatrix, matrixSize))*0.5;
+    cout << "solutions equal: " << (currentBestSolutionFromSolver == targetValueAfterOptimization) << " difference: " << targetValueAfterOptimization - currentBestSolutionFromSolver << endl;
+    cout << "both solver solutions equal: " << (fastCurrentBestSolutionFromSover == currentBestSolutionFromSolver) << " diffrence: " << fastCurrentBestSolutionFromSover - currentBestSolutionFromSolver << endl;
     cout << "target value after optimization: " << targetValueAfterOptimization << endl;
     cout << "Optimized matrix:" << endl;
     printMatrix(optimizedMatrix, matrixSize);
-
+    cout << "optimized matrix - get target function value by passing array: " << geneticAlgorithmSolver.getTargetFunctionValueForPassedMatrix(optimizedMatrix) << endl;
     for (unsigned int i = 0; i < matrixSize; i++)
     {
         delete[] matrix[i];

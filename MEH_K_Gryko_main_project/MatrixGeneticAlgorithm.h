@@ -32,6 +32,7 @@ private:
 	static constexpr GeneField getGeneFieldZero();
 	static constexpr GeneField getGeneFieldOne();
 	static constexpr GeneField getGeneFieldTwo();
+	static constexpr MatrixField getMatrixFieldZero();
 	GeneField** parentPopulation;
 	GeneField** childrenPopulation;
 	MatrixField* parentPopulationTargetFunVals;
@@ -82,6 +83,7 @@ public:
 	~MatrixGeneticAlgorithm();
 	double targetFunctionValue(GeneField* solution);
 	double getCurrentBestSolutionTargetFunctionValue();
+	double getTargetFunctionValueForPassedMatrix(MatrixField** passedMatrix);
 	MatrixField getCurrentBestSolutionTargetFunctionValueNoHalf();
 	MatrixField** getCurrentBestSolution();
 };
@@ -179,6 +181,11 @@ template <typename GeneField, typename MatrixField> constexpr GeneField MatrixGe
 template <typename GeneField, typename MatrixField>  constexpr GeneField MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldTwo()
 {
 	return static_cast<GeneField>(2u);
+}
+
+template <typename GeneField, typename MatrixField>  constexpr MatrixField MatrixGeneticAlgorithm<GeneField, MatrixField>::getMatrixFieldZero()
+{
+	return static_cast<MatrixField>(0u);
 }
 
 template <typename GeneField, typename MatrixField> GeneField MatrixGeneticAlgorithm<GeneField, MatrixField>::getDecodingArrayRealSize()
@@ -326,6 +333,22 @@ template <typename GeneField, typename MatrixField> double MatrixGeneticAlgorith
 	return static_cast<double>(targetFunctionValueNoHalf(solution)) * 0.5;
 }
 
+template <typename GeneField, typename MatrixField> double MatrixGeneticAlgorithm<GeneField, MatrixField>::getTargetFunctionValueForPassedMatrix(MatrixField** passedMatrix)
+{
+	copyMatrixToTargetFunctionArray(passedMatrix);
+	unsigned int matrixSizeWithOffset = matrixSize + 1u;
+	MatrixField targetFunValue = MatrixGeneticAlgorithm<GeneField, MatrixField>::getMatrixFieldZero();
+	for (unsigned int i = 1u; i < matrixSizeWithOffset; i++)
+	{
+		for (unsigned int j = 1u; j < matrixSizeWithOffset; j++)
+		{
+			targetFunValue += matrixCopyForFitnessEvaluation[i][j] * (matrixCopyForFitnessEvaluation[i - 1][j] + matrixCopyForFitnessEvaluation[i + 1][j] +
+				matrixCopyForFitnessEvaluation[i][j - 1] + matrixCopyForFitnessEvaluation[i][j + 1]);
+		}
+	}
+	return static_cast<double>(targetFunValue)*0.5;
+}
+
 template <typename GeneField, typename MatrixField> MatrixField MatrixGeneticAlgorithm<GeneField, MatrixField>::targetFunctionValueNoHalf(GeneField* solution)
 {
 	copyMatrixToTargetFunctionArray(matrixBeforeOptimization);
@@ -333,14 +356,14 @@ template <typename GeneField, typename MatrixField> MatrixField MatrixGeneticAlg
 	decodeMatrix(solution);
 	//std::cout << "targetFunctionValueNoHalf: after decoding with decoding array" << std::endl;
 	unsigned int matrixSizeWithOffset = matrixSize + 1u;
-	MatrixField targetFunValue = static_cast<MatrixField>(0u);
+	MatrixField targetFunValue = MatrixGeneticAlgorithm<GeneField, MatrixField>::getMatrixFieldZero();
 	//std::cout << "targetFunctionValueNoHalf: before calculating target function value" << std::endl;
 	for (unsigned int i = 1u; i < matrixSizeWithOffset; i++)
 	{
 		for (unsigned int j = 1u; j < matrixSizeWithOffset; j++)
 		{
-			targetFunValue += matrixCopyForFitnessEvaluation[i][j] * (matrixCopyForFitnessEvaluation[i - 1][j] + matrixCopyForFitnessEvaluation[i + 1][j] +
-				matrixCopyForFitnessEvaluation[i][j - 1] + matrixCopyForFitnessEvaluation[i][j + 1]);
+			targetFunValue += (matrixCopyForFitnessEvaluation[i][j] * (matrixCopyForFitnessEvaluation[i - 1][j] + matrixCopyForFitnessEvaluation[i + 1][j] +
+				matrixCopyForFitnessEvaluation[i][j - 1] + matrixCopyForFitnessEvaluation[i][j + 1]));
 		}
 	}
 	//std::cout << "targetFunctionValueNoHalf: after calculating target function value" << std::endl;
@@ -437,13 +460,13 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 		}
 	}
 	
-	std::cout << "fillDecodingArray: Decoding matrix: " << std::endl;
+	//std::cout << "fillDecodingArray: Decoding matrix: " << std::endl;
 	//testingCode
-	for (GeneField i = static_cast<GeneField>(0u); i < getDecodingArrayRealSize() ; i+=two)
-	{
-		std::cout << decodingArray[i] << " -> " << decodingArray[i + one] << std::endl;
-	}
-	std::cout << "fillDecodingArray: Decoding array printed" << std::endl;
+	//for (GeneField i = static_cast<GeneField>(0u); i < getDecodingArrayRealSize() ; i+=two)
+	//{
+	//	std::cout << decodingArray[i] << " -> " << decodingArray[i + one] << std::endl;
+	//}
+	//std::cout << "fillDecodingArray: Decoding array printed" << std::endl;
 	//testingCodeDone
 }
 

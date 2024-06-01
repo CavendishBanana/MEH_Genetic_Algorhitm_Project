@@ -387,12 +387,12 @@ template <typename GeneField, typename MatrixField> void  MatrixGeneticAlgorithm
 	{
 		matrixCopyForFitnessEvaluation[i] = new MatrixField[matrixSize + 2u];
 	}
-	for (unsigned int i = 0u; i < matrixSize + 2; i++)
+	for (unsigned int i = 0u; i < matrixSize + 2u; i++)
 	{
-		matrixCopyForFitnessEvaluation[0][i] = static_cast<MatrixField>(0u);
-		matrixCopyForFitnessEvaluation[i][0] = static_cast<MatrixField>(0u);
-		matrixCopyForFitnessEvaluation[matrixSize - 1u][i] = static_cast<MatrixField>(0u);
-		matrixCopyForFitnessEvaluation[i][matrixSize - 1u] = static_cast<MatrixField>(0u);
+		matrixCopyForFitnessEvaluation[0u][i] = MatrixGeneticAlgorithm<GeneField, MatrixField>::getMatrixFieldZero();
+		matrixCopyForFitnessEvaluation[i][0u] = MatrixGeneticAlgorithm<GeneField, MatrixField>::getMatrixFieldZero();
+		matrixCopyForFitnessEvaluation[matrixSize + 1u][i] = MatrixGeneticAlgorithm<GeneField, MatrixField>::getMatrixFieldZero();
+		matrixCopyForFitnessEvaluation[i][matrixSize + 1u] = MatrixGeneticAlgorithm<GeneField, MatrixField>::getMatrixFieldZero();
 	}
 	for (unsigned int i = 0u; i < matrixSize; i++)
 	{

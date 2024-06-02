@@ -64,6 +64,7 @@ if (i - 1u >= 0u && j - 1u >= 0u)
 
 double getTargetFunValueHalf(long int** matrix, unsigned int matrixSize)
 {
+    /*
     int totalSum = 0;
     for (unsigned int i = 0; i < matrixSize; i++)
     {
@@ -90,8 +91,8 @@ double getTargetFunValueHalf(long int** matrix, unsigned int matrixSize)
             totalSum += (matrix[i][j] * localSum);
         }
 
-    }
-    return static_cast<double>(totalSum)*0.5;
+    }*/
+    return static_cast<double>(getTargetFunValueNoHalf(matrix, matrixSize))*0.5;
 }
 
 void printMatrix(long int** matrix, unsigned int matrixSize)
@@ -129,26 +130,29 @@ int main()
     }
 
     printMatrix(matrix, matrixSize);
-    
-    MatrixGeneticAlgorithm<unsigned short, long int> geneticAlgorithmSolver = MatrixGeneticAlgorithm<unsigned short, long int>(matrix, matrixSize, 2.0, 20.0, 3.0, 2.0, engine, 0.95, 0.07, 4);
+    cout << "===========================================================================================" << endl;
+    MatrixGeneticAlgorithm<unsigned short, long int> geneticAlgorithmSolver = MatrixGeneticAlgorithm<unsigned short, long int>(matrix, matrixSize, 2.0, 15.0, 1.5, 2.0, engine, 0.95, 0.07, 4, 10, 0.2);
     
     double startingTargetValue = geneticAlgorithmSolver.getTargetFunctionValueForPassedMatrix(matrix);
     cout << "Target value before optimization: " << startingTargetValue << endl;
-    
+    geneticAlgorithmSolver.useNPointUniformMixedCrossoverInGeneratingChildrenPopulation();
     unsigned int generationsCount = 20000;
     geneticAlgorithmSolver.solveWithNGenerations(generationsCount, true);
 
     long int** optimizedMatrix = geneticAlgorithmSolver.getCurrentBestSolution();
-    double currentBestSolutionFromSolver = geneticAlgorithmSolver.getCurrentBestSolutionTargetFunctionValue();
-    double fastCurrentBestSolutionFromSover = geneticAlgorithmSolver.getCurrentBestSolutionTargetFunctionValue();
-    cout << "best solution target function value from solver: " << currentBestSolutionFromSolver << endl;
-    double targetValueAfterOptimization = static_cast<double>(getTargetFunValueNoHalf(optimizedMatrix, matrixSize))*0.5;
-    cout << "solutions equal: " << (currentBestSolutionFromSolver == targetValueAfterOptimization) << " difference: " << targetValueAfterOptimization - currentBestSolutionFromSolver << endl;
-    cout << "both solver solutions equal: " << (fastCurrentBestSolutionFromSover == currentBestSolutionFromSolver) << " diffrence: " << fastCurrentBestSolutionFromSover - currentBestSolutionFromSolver << endl;
-    cout << "target value after optimization: " << targetValueAfterOptimization << endl;
+    double targetValueForPassedOptimizedMatrix = geneticAlgorithmSolver.getTargetFunctionValueForPassedMatrix(optimizedMatrix);
+    double targetValueForBestSolutionRememberedBySolver = geneticAlgorithmSolver.getCurrentBestSolutionTargetFunctionValue();
+    cout << "target value for passed optimized matrix: " << targetValueForPassedOptimizedMatrix << endl;
+    cout << "best target value remembered by solver " << targetValueForBestSolutionRememberedBySolver << endl;
+    cout << "Their difference: " << targetValueForPassedOptimizedMatrix - targetValueForBestSolutionRememberedBySolver << endl;
+    //double targetValueAfterOptimization = static_cast<double>(getTargetFunValueNoHalf(optimizedMatrix, matrixSize))*0.5;
+    //cout << "solutions equal: " << (targetValueForPassedOptimizedMatrix == targetValueAfterOptimization) << " difference: " << targetValueAfterOptimization - targetValueForPassedOptimizedMatrix << endl;
+    //cout << "both solver solutions equal: " << (targetValueForBestSolutionRememberedBySolver == targetValueForPassedOptimizedMatrix) << " diffrence: " << targetValueForBestSolutionRememberedBySolver - targetValueForPassedOptimizedMatrix << endl;
+    //cout << "target value after optimization: " << targetValueAfterOptimization << endl;
+    cout << "===========================================================================================" << endl;
     cout << "Optimized matrix:" << endl;
     printMatrix(optimizedMatrix, matrixSize);
-    cout << "optimized matrix - get target function value by passing array: " << geneticAlgorithmSolver.getTargetFunctionValueForPassedMatrix(optimizedMatrix) << endl;
+    //cout << "optimized matrix - get target function value by passing array: " << geneticAlgorithmSolver.getTargetFunctionValueForPassedMatrix(optimizedMatrix) << endl;
     for (unsigned int i = 0; i < matrixSize; i++)
     {
         delete[] matrix[i];

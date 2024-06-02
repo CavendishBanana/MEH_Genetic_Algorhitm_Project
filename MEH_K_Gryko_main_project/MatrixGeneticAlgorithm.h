@@ -13,16 +13,30 @@ template <typename GeneField, typename MatrixField> class MatrixGeneticAlgorithm
 private:
 	MatrixField** matrixBeforeOptimization;
 	MatrixField** matrixCopyForFitnessEvaluation;
+	int* matrixCopyHashingRowsArray;
+	int* matrixCopyHashingColsArray;
+	int* matrixCopyHashingRowsArrayWithOffsets;
+	int* matrixCopyHashingColsArrayWithOffsets;
 	unsigned int inversionMutationGenesCount;
 	unsigned int matrixSize;
+
+	unsigned int nPointCrossoverRowsOffset;
+	unsigned int nPointCrossoverColsOffset;
+	unsigned int nPointCrossoverBaseSplitLength;
+	unsigned int nPointCrossoverTotalSplitsCount;
+
+	double mixedCrossoverNPointUniformThreshold;
 	
 	GeneField* bestSolution;
 	MatrixField bestSolutionTargetFunctionValue;
 
 	unsigned int populationSize;
 	unsigned int chromosomeLength;
+	unsigned int halfChromosomeLength;
 	unsigned int* decodingArray;
 	double crossoverProbability, mutationProbability;
+
+	void (MatrixGeneticAlgorithm<GeneField, MatrixField>::*crossoverOperationFunctionPointer)(GeneField* parent1, GeneField* parent2, GeneField* child1, GeneField* child2);
 
 
 	GeneField decodingArrayRealSize;
@@ -52,7 +66,7 @@ private:
 
 	void fillDecodingArray();
 	void generateStartingPopulation(double populationPower, double populationMultplier);
-	GeneField getGenesCount();
+	inline GeneField getGenesCount();
 	std::default_random_engine& randomEngine;
 	std::uniform_int_distribution<GeneField> distribution;
 	void copyMatrixToTargetFunctionArray(MatrixField** source);
@@ -60,10 +74,13 @@ private:
 	
 	MatrixField targetFunctionValueNoHalf(GeneField* solution);
 	void decodeMatrix(GeneField* chromosome);
-	void crossover(GeneField* parent1, GeneField* parent2, GeneField* child1, GeneField* child2);
+	void crossoverUniform(GeneField* parent1, GeneField* parent2, GeneField* child1, GeneField* child2);
+	void crossoverNPoint(GeneField* parent1, GeneField* parent2, GeneField* child1, GeneField* child2);
+	void nPointUniformMixedCrossover(GeneField* parent1, GeneField* parent2, GeneField* child1, GeneField* child2);
 	void mutationByInversion(GeneField* specimen);
 	void mutationByAlteringGeneValue(GeneField* specimen);
 	void findParamsForAlteringMutation(unsigned int runsCount = 10000000u);
+	void findParamsForNPointCrossover();
 	unsigned int findBestSolutionIndexInArray(MatrixField* targetFunctionValues, unsigned int targetFunValsArrayLength);
 	void generateChildrenPopulation();
 	void tournamentSelectionMiPlusLambda();
@@ -72,6 +89,7 @@ private:
 	void setDecodingArrayValue(GeneField geneValue, unsigned int from, unsigned int to);
 	GeneField minimalColumnIndex();
 	GeneField genesCount;
+	
 
 public:
 	void solveWithNGenerations(unsigned int generationsCount, bool verbose = false);
@@ -79,16 +97,20 @@ public:
 	unsigned int* decodeWithArray(unsigned int* returnValueArray, GeneField geneValue);
 	MatrixGeneticAlgorithm(MatrixField** staringMatrix, unsigned int startingMatrixSize, double populationMatrSizePower,
 		double populationSizeMultiplier, double chromesomeLenMatrSizePower, double chromosomeSizeMultplier, 
-		std::default_random_engine& randomEngine, double crossoverProbability, double mutationProbability, unsigned int tournamentGroupSize);
+		std::default_random_engine& randomEngine, double crossoverProbability, double mutationProbability, 
+		unsigned int tournamentGroupSize, unsigned int nPointCrossoverSplitsCount, double mixedCrossoverNPointUniformThreshold);
 	~MatrixGeneticAlgorithm();
 	double targetFunctionValue(GeneField* solution);
 	double getCurrentBestSolutionTargetFunctionValue();
 	double getTargetFunctionValueForPassedMatrix(MatrixField** passedMatrix);
 	MatrixField getCurrentBestSolutionTargetFunctionValueNoHalf();
 	MatrixField** getCurrentBestSolution();
+	void useNPointCrossoverInGeneratingChildrenPopulation();
+	void useUniformCrossoverInGeneratingChildrenPopulation();
+	void useNPointUniformMixedCrossoverInGeneratingChildrenPopulation();
 };
 
-template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::crossover(GeneField* parent1, GeneField* parent2, GeneField* child1, GeneField* child2)
+template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::crossoverUniform(GeneField* parent1, GeneField* parent2, GeneField* child1, GeneField* child2)
 {
 	//uniform crossover
 	std::uniform_int_distribution<unsigned int> coinFlipping = std::uniform_int_distribution<unsigned int>(1, 10000);
@@ -107,6 +129,109 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 		}
 	}
 }
+
+template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::findParamsForNPointCrossover()
+{
+	nPointCrossoverBaseSplitLength = (chromosomeLength - (chromosomeLength % nPointCrossoverTotalSplitsCount)) / nPointCrossoverTotalSplitsCount;
+	nPointCrossoverRowsOffset = halfChromosomeLength % nPointCrossoverBaseSplitLength;
+	nPointCrossoverColsOffset = (chromosomeLength - halfChromosomeLength) % nPointCrossoverBaseSplitLength;
+}
+
+template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::useNPointCrossoverInGeneratingChildrenPopulation()
+{
+	crossoverOperationFunctionPointer = &MatrixGeneticAlgorithm<GeneField, MatrixField>::crossoverNPoint;
+}
+template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::useUniformCrossoverInGeneratingChildrenPopulation()
+{
+	crossoverOperationFunctionPointer = &MatrixGeneticAlgorithm<GeneField, MatrixField>::crossoverNPoint;
+}
+template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::useNPointUniformMixedCrossoverInGeneratingChildrenPopulation()
+{
+	crossoverOperationFunctionPointer = &MatrixGeneticAlgorithm<GeneField, MatrixField>::nPointUniformMixedCrossover;
+}
+
+
+template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::crossoverNPoint(GeneField* parent1, GeneField* parent2, GeneField* child1, GeneField* child2)
+{
+	GeneField* child1Backup = child1;
+	GeneField* child2Backup = child2;
+	unsigned int currentPartitionBeginIdx = 0u;
+	for (unsigned int i = 0u; i < nPointCrossoverRowsOffset; i++)
+	{
+		child1[i] = parent1[i];
+		child2[i] = parent2[i];
+	}
+	currentPartitionBeginIdx += nPointCrossoverRowsOffset;
+	while (currentPartitionBeginIdx < halfChromosomeLength)
+	{
+		unsigned int thisSplitStop = currentPartitionBeginIdx + nPointCrossoverBaseSplitLength;
+		thisSplitStop = (thisSplitStop < halfChromosomeLength ? thisSplitStop : halfChromosomeLength);
+		unsigned int i = currentPartitionBeginIdx;
+		while ( i < thisSplitStop)
+		{
+			child1[i] = parent1[i];
+			child2[i] = parent2[i];
+			i++;
+		}
+
+		//for (unsigned int i = currentPartitionBeginIdx; i < thisSplitStop; i++)
+		//{
+		//	child1[i] = parent1[i];
+		//	child2[i] = parent2[i];
+		//}
+		currentPartitionBeginIdx = thisSplitStop;
+		GeneField* tmp = child1;
+		child1 = child2;
+		child2 = tmp;
+	}
+	child1 = child1Backup;
+	child2 = child2Backup;
+	for (unsigned int i = halfChromosomeLength; i < halfChromosomeLength +  nPointCrossoverColsOffset; i++)
+	{
+		child1[i] = parent1[i];
+		child2[i] = parent2[i];
+	}
+	currentPartitionBeginIdx = halfChromosomeLength + nPointCrossoverColsOffset;
+	while (currentPartitionBeginIdx < chromosomeLength)
+	{
+		//unsigned int thisSplitStop = currentPartitionBeginIdx + nPointCrossoverBaseSplitLength;
+		//for (unsigned int i = currentPartitionBeginIdx; i < thisSplitStop; i++)
+		//{
+		//	child1[i] = parent1[i];
+		//	child2[i] = parent2[i];
+		//}
+		unsigned int thisSplitStop = currentPartitionBeginIdx + nPointCrossoverBaseSplitLength;
+		thisSplitStop = (thisSplitStop < chromosomeLength ? thisSplitStop :chromosomeLength);
+		unsigned int i = currentPartitionBeginIdx;
+		while (i < thisSplitStop)
+		{
+			child1[i] = parent1[i];
+			child2[i] = parent2[i];
+			i++;
+		}
+
+		currentPartitionBeginIdx = thisSplitStop;
+		GeneField* tmp = child1;
+		child1 = child2;
+		child2 = tmp;
+	}
+}
+template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::nPointUniformMixedCrossover(GeneField* parent1, GeneField* parent2, GeneField* child1, GeneField* child2)
+{
+	crossoverNPoint(parent1, parent2, child1, child2);
+	std::uniform_real_distribution<double> uniformCrossoverDistr = std::uniform_real_distribution<double>(0.0, 1.0);
+	for (unsigned int i = 0u; i < chromosomeLength; i++)
+	{
+		if (uniformCrossoverDistr(randomEngine) <= mixedCrossoverNPointUniformThreshold)
+		{
+			GeneField tmp = child1[i];
+			child1[i] = child2[i];
+			child2[i] = tmp;
+		}
+	}
+
+}
+
 
 template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::mutationByInversion(GeneField* specimen)
 {
@@ -223,24 +348,28 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 template <typename GeneField, typename MatrixField> MatrixGeneticAlgorithm<GeneField, MatrixField>::MatrixGeneticAlgorithm(
 	MatrixField** staringMatrix, unsigned int startingMatrixSize, double populationMatrSizePower,
 	double populationSizeMultiplier, double chromesomeLenMatrSizePower, double chromosomeSizeMultplier, 
-	std::default_random_engine& randomEngine, double crossoverProbability, double mutationProbability, unsigned int tournamentGroupSize) :
+	std::default_random_engine& randomEngine, double crossoverProbability, double mutationProbability, 
+	unsigned int tournamentGroupSize, unsigned int nPointCrossoverSplitsCount, double mixedCrossoverNPointUniformThreshold) :
 	//geneFieldOne(static_cast<GeneField>(1u)),
 	//geneFieldTwo(static_cast<GeneField>(2u)),
 	//geneFieldZero(static_cast<GeneField>(0u)),
 	matrixSize(startingMatrixSize),
 	chromosomeLength(static_cast<unsigned int>(ceil(pow(startingMatrixSize, chromesomeLenMatrSizePower)* static_cast<double>(chromosomeSizeMultplier)))),
+	halfChromosomeLength(static_cast<unsigned int>(ceil(pow(startingMatrixSize, chromesomeLenMatrSizePower)* static_cast<double>(chromosomeSizeMultplier)))/2u),
 	populationSize(static_cast<unsigned int>(ceil(pow(startingMatrixSize, populationMatrSizePower) * populationSizeMultiplier))),
-	decodingArrayRealSize(static_cast<GeneField>(startingMatrixSize)* (static_cast<GeneField>(startingMatrixSize) - MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldOne())* MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldTwo()),
+	decodingArrayRealSize(static_cast<GeneField>(startingMatrixSize)* (static_cast<GeneField>(startingMatrixSize) - MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldOne())),
 	randomEngine(randomEngine),
-	distribution( std::uniform_int_distribution<GeneField>(MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldZero(), static_cast<GeneField>(startingMatrixSize)* (static_cast<GeneField>(startingMatrixSize) - MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldOne()) - MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldOne())),
+	distribution( std::uniform_int_distribution<GeneField>(MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldZero(), ( static_cast<GeneField>(startingMatrixSize)* (static_cast<GeneField>(startingMatrixSize) - MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldOne()) / MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldTwo() ) - MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldOne())),
 	inversionMutationGenesCount( static_cast<unsigned int>(std::max(floor(cbrt(static_cast<double>(startingMatrixSize)) * log2(chromesomeLenMatrSizePower)), 2.0)) ),
 	crossoverProbability(crossoverProbability),
 	mutationProbability(mutationProbability),
 	tournamentGroupSize(tournamentGroupSize),
-	genesCount(static_cast<GeneField>(startingMatrixSize)* (static_cast<GeneField>(startingMatrixSize) - MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldOne()))
+	genesCount((static_cast<GeneField>(startingMatrixSize)* (static_cast<GeneField>(startingMatrixSize) - MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldOne())) / MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldTwo() ),
+	nPointCrossoverTotalSplitsCount(nPointCrossoverSplitsCount),
+	mixedCrossoverNPointUniformThreshold(mixedCrossoverNPointUniformThreshold)
 {
 	//constructor body start
-	std::cout << "Constructor starts working, chromosome length: "<<chromosomeLength << std::endl;
+	//std::cout << "Constructor starts working, chromosome length: "<<chromosomeLength << std::endl;
 	if (populationSize % 2u == 1u)
 	{
 		populationSize++;
@@ -266,16 +395,19 @@ template <typename GeneField, typename MatrixField> MatrixGeneticAlgorithm<GeneF
 		selectionIsInNewParentGenerationArr[i] = false;
 		selectionIsInNewParentGenerationArr[i + populationSize] = false;
 	}
+	findParamsForNPointCrossover();
 	findParamsForAlteringMutation();
-	std::cout << "constructor: Arrays allocated" << std::endl;
+	//std::cout << "constructor: Arrays allocated" << std::endl;
 	initOptimizedMatrix(staringMatrix);
 	
-	std::cout << "Before decoding array filling" << std::endl;
+	//std::cout << "Before decoding array filling" << std::endl;
 	fillDecodingArray();
-	std::cout << "After decoding array filling" << std::endl;
+	//std::cout << "After decoding array filling" << std::endl;
 	generateStartingPopulation(populationMatrSizePower, populationSizeMultiplier);
 	
-	std::cout << "Constructor finished work" << std::endl;
+	crossoverOperationFunctionPointer = &MatrixGeneticAlgorithm<GeneField, MatrixField>::crossoverNPoint;
+
+	//std::cout << "Constructor finished work" << std::endl;
 }
 
 template <typename GeneField, typename MatrixField> void  MatrixGeneticAlgorithm<GeneField, MatrixField>::copyMatrixToTargetFunctionArray(MatrixField** source)
@@ -291,31 +423,29 @@ template <typename GeneField, typename MatrixField> void  MatrixGeneticAlgorithm
 
 template <typename GeneField, typename MatrixField> void  MatrixGeneticAlgorithm<GeneField, MatrixField>::decodeMatrix(GeneField* solution)
 {
-	unsigned int swapArray[] = {0u, 0u};
+	unsigned int swapArray[2];
 	GeneField minColumnSwapIdx = minimalColumnIndex();
-	
-	for (unsigned int i = 0u; i < chromosomeLength; i++)
+	for (unsigned int i = 0u; i < matrixSize; i++)
 	{
-		//std::cout << "decodeMatrix: before decodeWithArray" << std::endl;
-		decodeWithArray(swapArray, solution[i]);
-		//std::cout << "decodeMatrix: after decodeWithArray" << std::endl;
-		if (solution[i] < minColumnSwapIdx)
-		{
-			MatrixField* tmp = matrixCopyForFitnessEvaluation[swapArray[0u] + 1u];
-			matrixCopyForFitnessEvaluation[swapArray[0u] + 1u] = matrixCopyForFitnessEvaluation[swapArray[1u] + 1u];
-			matrixCopyForFitnessEvaluation[swapArray[1u] + 1u] = tmp;
-		}
-		else
-		{
-			unsigned int fromColumn = swapArray[0u] + 1u, toColumn = swapArray[1u] + 1u;
-			for (unsigned int i = 1u; i < matrixSize + 1u; i++)
-			{
-				MatrixField tmp = matrixCopyForFitnessEvaluation[i][fromColumn];
-				matrixCopyForFitnessEvaluation[i][fromColumn] = matrixCopyForFitnessEvaluation[i][toColumn];
-				matrixCopyForFitnessEvaluation[i][toColumn] = tmp;
-			}
-		}
+		matrixCopyHashingRowsArray[i] = i;
+		matrixCopyHashingColsArray[i] = i;
 	}
+
+	for (unsigned int i = 0u; i < halfChromosomeLength; i++)
+	{
+		decodeWithArray(swapArray, solution[i]);
+		unsigned int tmp = matrixCopyHashingRowsArray[swapArray[0u]];
+		matrixCopyHashingRowsArray[swapArray[0u]] = matrixCopyHashingRowsArray[swapArray[1u]];
+		matrixCopyHashingRowsArray[swapArray[1u]] = tmp;
+	}
+	for (unsigned int i = halfChromosomeLength; i < chromosomeLength; i++)
+	{
+		decodeWithArray(swapArray, solution[i]);
+		unsigned int tmp = matrixCopyHashingRowsArray[swapArray[0u]];
+		matrixCopyHashingColsArray[swapArray[0u]] = matrixCopyHashingColsArray[swapArray[1u]];
+		matrixCopyHashingColsArray[swapArray[1u]] = tmp;
+	}
+
 }
 
 template <typename GeneField, typename MatrixField> double MatrixGeneticAlgorithm<GeneField, MatrixField>::getCurrentBestSolutionTargetFunctionValue()
@@ -335,29 +465,10 @@ template <typename GeneField, typename MatrixField> double MatrixGeneticAlgorith
 
 template <typename GeneField, typename MatrixField> double MatrixGeneticAlgorithm<GeneField, MatrixField>::getTargetFunctionValueForPassedMatrix(MatrixField** passedMatrix)
 {
+	//TODO FIX IT
 	copyMatrixToTargetFunctionArray(passedMatrix);
 	unsigned int matrixSizeWithOffset = matrixSize + 1u;
 	MatrixField targetFunValue = MatrixGeneticAlgorithm<GeneField, MatrixField>::getMatrixFieldZero();
-	for (unsigned int i = 1u; i < matrixSizeWithOffset; i++)
-	{
-		for (unsigned int j = 1u; j < matrixSizeWithOffset; j++)
-		{
-			targetFunValue += matrixCopyForFitnessEvaluation[i][j] * (matrixCopyForFitnessEvaluation[i - 1][j] + matrixCopyForFitnessEvaluation[i + 1][j] +
-				matrixCopyForFitnessEvaluation[i][j - 1] + matrixCopyForFitnessEvaluation[i][j + 1]);
-		}
-	}
-	return static_cast<double>(targetFunValue)*0.5;
-}
-
-template <typename GeneField, typename MatrixField> MatrixField MatrixGeneticAlgorithm<GeneField, MatrixField>::targetFunctionValueNoHalf(GeneField* solution)
-{
-	copyMatrixToTargetFunctionArray(matrixBeforeOptimization);
-	//std::cout << "targetFunctionValueNoHalf: after copying matrix to target function array" << std::endl;
-	decodeMatrix(solution);
-	//std::cout << "targetFunctionValueNoHalf: after decoding with decoding array" << std::endl;
-	unsigned int matrixSizeWithOffset = matrixSize + 1u;
-	MatrixField targetFunValue = MatrixGeneticAlgorithm<GeneField, MatrixField>::getMatrixFieldZero();
-	//std::cout << "targetFunctionValueNoHalf: before calculating target function value" << std::endl;
 	for (unsigned int i = 1u; i < matrixSizeWithOffset; i++)
 	{
 		for (unsigned int j = 1u; j < matrixSizeWithOffset; j++)
@@ -366,17 +477,55 @@ template <typename GeneField, typename MatrixField> MatrixField MatrixGeneticAlg
 				matrixCopyForFitnessEvaluation[i][j - 1] + matrixCopyForFitnessEvaluation[i][j + 1]));
 		}
 	}
+	copyMatrixToTargetFunctionArray(matrixBeforeOptimization);
+	return static_cast<double>(targetFunValue)*0.5;
+}
+
+template <typename GeneField, typename MatrixField> MatrixField MatrixGeneticAlgorithm<GeneField, MatrixField>::targetFunctionValueNoHalf(GeneField* solution)
+{
+	//copyMatrixToTargetFunctionArray(matrixBeforeOptimization);
+	//std::cout << "targetFunctionValueNoHalf: after copying matrix to target function array" << std::endl;
+	decodeMatrix(solution);
+	//std::cout << "targetFunctionValueNoHalf: after decoding with decoding array" << std::endl;
+	unsigned int matrixSizeWithOffset = matrixSize + 1u;
+	MatrixField targetFunValue = MatrixGeneticAlgorithm<GeneField, MatrixField>::getMatrixFieldZero();
+	//std::cout << "targetFunctionValueNoHalf: before calculating target function value" << std::endl;
+	
+	
+	for (int i = 0; i < static_cast<int>(matrixSize); i++)
+	{
+		for (int j = 0; j < static_cast<int>(matrixSize); j++)
+		{
+			targetFunValue += ( matrixCopyForFitnessEvaluation[ matrixCopyHashingRowsArray[i] + 1][ matrixCopyHashingColsArray[j] +1 ] * (
+				matrixCopyForFitnessEvaluation[matrixCopyHashingRowsArray[i - 1] + 1][matrixCopyHashingColsArray[j] + 1] + 
+				matrixCopyForFitnessEvaluation[matrixCopyHashingRowsArray[i + 1] + 1][matrixCopyHashingColsArray[j] + 1] + 
+				matrixCopyForFitnessEvaluation[matrixCopyHashingRowsArray[i] + 1][matrixCopyHashingColsArray[j - 1] + 1] + 
+				matrixCopyForFitnessEvaluation[matrixCopyHashingRowsArray[i] + 1][matrixCopyHashingColsArray[j + 1] + 1])  );
+		}
+	}
+
 	//std::cout << "targetFunctionValueNoHalf: after calculating target function value" << std::endl;
 	return targetFunValue;
 }
 
 template <typename GeneField, typename MatrixField> void  MatrixGeneticAlgorithm<GeneField, MatrixField>::initOptimizedMatrix(MatrixField** source)
 {
+	
 	matrixBeforeOptimization = new MatrixField*[matrixSize];
 	matrixCopyForFitnessEvaluation = new MatrixField*[matrixSize + 2u];
+	matrixCopyHashingColsArrayWithOffsets = new int[matrixSize + 2u];
+	matrixCopyHashingRowsArrayWithOffsets = new int[matrixSize + 2u];
+	matrixCopyHashingColsArray = matrixCopyHashingColsArrayWithOffsets + 1;
+	matrixCopyHashingRowsArray = matrixCopyHashingRowsArrayWithOffsets + 1;
+	matrixCopyHashingColsArrayWithOffsets[0u] = -1;
+	matrixCopyHashingColsArrayWithOffsets[matrixSize + 1u] = static_cast<int>(matrixSize);
+	matrixCopyHashingRowsArrayWithOffsets[0u] = -1;
+	matrixCopyHashingRowsArrayWithOffsets[matrixSize + 1u] = static_cast<int>(matrixSize);
 
 	for (unsigned int i = 0u; i < matrixSize; i++)
 	{
+		matrixCopyHashingColsArray[i] = i;
+		matrixCopyHashingRowsArray[i] = i;
 		matrixBeforeOptimization[i] = new MatrixField[matrixSize];
 		for (unsigned int j = 0u; j < matrixSize; j++)
 		{
@@ -416,6 +565,8 @@ template <typename GeneField, typename MatrixField> MatrixGeneticAlgorithm<GeneF
 	delete[] bestSolution;
 	delete[] matrixBeforeOptimization;
 	delete[] matrixCopyForFitnessEvaluation;
+	delete[] matrixCopyHashingColsArrayWithOffsets;
+	delete[] matrixCopyHashingRowsArrayWithOffsets;
 	for (unsigned int i = 0u; i < populationSize; i++)
 	{
 		delete[] parentPopulation[i];
@@ -442,7 +593,7 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 	GeneField idx = MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldZero();
 	GeneField one = MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldOne();
 	GeneField two = MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldTwo();
-	GeneField columsOffset = static_cast<GeneField>(matrixSize) * (static_cast<GeneField>(matrixSize) - MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldOne() );
+	//GeneField columsOffset = static_cast<GeneField>(matrixSize) * (static_cast<GeneField>(matrixSize) - MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldOne() );
 	//GeneField columsOffset = minimalColumnIndex();
 	for (unsigned int i = 0u; i < matrixSize - 1u; i++)
 	{
@@ -451,8 +602,8 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 			
 			decodingArray[idx] = i;
 			decodingArray[idx + one] = j;
-			decodingArray[idx + columsOffset] = i;
-			decodingArray[idx + columsOffset + one] = j;
+			//decodingArray[idx + columsOffset] = i;
+			//decodingArray[idx + columsOffset + one] = j;
 			idx += two;
 			
 			//setDecodingArrayValue(idx, i, j);
@@ -499,17 +650,17 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 		{
 			parentPopulation[i][j] = distribution(randomEngine);
 			//testingCode
-			if (parentPopulation[i][j] >= genesCount)
-			{
-				std::cout << "\n\n\n\n\n\n\ngenerateStartingPopulation: too big gene!!! " << parentPopulation[i][j] << ", genesCount: " << genesCount <<"\n\n\n\n\n\n" << std::endl;
-			}
+			//if (parentPopulation[i][j] >= getGenesCount())
+			//{
+			//	std::cout << "\n\n\n\n\n\n\ngenerateStartingPopulation: too big gene!!! " << parentPopulation[i][j] << ", genesCount: " << genesCount <<"\n\n\n\n\n\n" << std::endl;
+			//}
 			//testingCodeDone
 		}
 	}
 	//make sure that every gene is present in some specimen
 	std::uniform_int_distribution<unsigned int> distributionPopulation = std::uniform_int_distribution<unsigned int>(0u, populationSize - 1);
 	std::uniform_int_distribution<unsigned int> distributionChromosome = std::uniform_int_distribution<unsigned int>(0u, chromosomeLength - 1);
-	std::cout << "generate starting population: before loop with adding fixed amount of each gene for population" << std::endl;
+	//std::cout << "generate starting population: before loop with adding fixed amount of each gene for population" << std::endl;
 	unsigned int singleGeneRepetitionsCount = static_cast<unsigned int>(floor(std::max(static_cast<double>(matrixSize), pow(static_cast<double>(matrixSize), std::max(cbrt(populationPower), 1.0)) * std::max(cbrt(populationMultplier), 1.0))));
 	for (GeneField i = MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldZero(); i < getGenesCount(); i++)
 	{
@@ -520,21 +671,21 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 			parentPopulation[specimenNo][geneNo] = i;
 		}
 	}
-	std::cout << "generate starting population: after loop with adding fixed amount of each gene for population" << std::endl;
+	//std::cout << "generate starting population: after loop with adding fixed amount of each gene for population" << std::endl;
 	//fill target function array with fitness values for starting population and find best solution
-	std::cout << "generate starting population: before calculating target fun vals" << std::endl;
+	//std::cout << "generate starting population: before calculating target fun vals" << std::endl;
 	for (unsigned int i = 0; i < populationSize; i++)
 	{
 		parentPopulationTargetFunVals[i] = targetFunctionValueNoHalf(parentPopulation[i]);
 	}
-	std::cout << "generate starting population: after calculating target fun vals" << std::endl;
+	//std::cout << "generate starting population: after calculating target fun vals" << std::endl;
 	unsigned int bestSolutionIdx = findBestSolutionIndexInArray(parentPopulationTargetFunVals, populationSize);
 	bestSolutionTargetFunctionValue = parentPopulationTargetFunVals[bestSolutionIdx];
 	for (unsigned int i = 0; i < chromosomeLength; i++)
 	{
 		bestSolution[i] = parentPopulation[bestSolutionIdx][i];
 	}
-	std::cout << "Starting population generated" << std::endl;
+	//std::cout << "Starting population generated" << std::endl;
 }
 
 template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::generateChildrenPopulation()
@@ -542,7 +693,7 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 	//std::cout << "generateChildrenPopulation: start generating population" << std::endl;
 	std::uniform_real_distribution<double> geneticOperatorsProbabilityGenerator = std::uniform_real_distribution<double>(0.0, 1.0);
 	std::uniform_int_distribution<unsigned int> parentsChoice = std::uniform_int_distribution<unsigned int>(0, populationSize - 1u);
-	unsigned int pairsCount = populationSize / 2u;
+	unsigned int pairsCount = populationSize >> 1u;
 	unsigned int newChildrenCount = 0u;
 	//go through all pairs of specimens and TRY to make them reproduce
 	//shuffling of the parent population done in the selection stage
@@ -550,7 +701,9 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 	{
 		if (geneticOperatorsProbabilityGenerator(randomEngine) <= crossoverProbability)
 		{
-			crossover(parentPopulation[i], parentPopulation[i + 1u], childrenPopulation[newChildrenCount], childrenPopulation[newChildrenCount + 1u]);
+			//crossoverUniform(parentPopulation[i], parentPopulation[i + 1u], childrenPopulation[newChildrenCount], childrenPopulation[newChildrenCount + 1u]);
+			//crossoverNPoint(parentPopulation[i], parentPopulation[i + 1u], childrenPopulation[newChildrenCount], childrenPopulation[newChildrenCount + 1u]);
+			(this->*crossoverOperationFunctionPointer)(parentPopulation[i], parentPopulation[i + 1u], childrenPopulation[newChildrenCount], childrenPopulation[newChildrenCount + 1u]);
 			newChildrenCount += 2u;
 		}
 	}
@@ -561,7 +714,9 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 		unsigned int parentTwoIdx = parentsChoice(randomEngine);
 		if (parentOneIdx != parentTwoIdx)
 		{
-			crossover(parentPopulation[parentOneIdx], parentPopulation[parentTwoIdx], childrenPopulation[newChildrenCount], childrenPopulation[newChildrenCount + 1u]);
+			//crossoverUniform(parentPopulation[parentOneIdx], parentPopulation[parentTwoIdx], childrenPopulation[newChildrenCount], childrenPopulation[newChildrenCount + 1u]);
+			//crossoverNPoint(parentPopulation[parentOneIdx], parentPopulation[parentTwoIdx], childrenPopulation[newChildrenCount], childrenPopulation[newChildrenCount + 1u]);
+			(this->*crossoverOperationFunctionPointer)(parentPopulation[parentOneIdx], parentPopulation[parentTwoIdx], childrenPopulation[newChildrenCount], childrenPopulation[newChildrenCount + 1u]);
 			newChildrenCount += 2u;
 		}
 	}
@@ -577,10 +732,11 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 		//check if child is better than best solution
 		if (childrenPopulationTargetFunVals[i] > bestSolutionTargetFunctionValue)
 		{
+			GeneField* newBestChildInChildrenPopulation = childrenPopulation[i];
 			bestSolutionTargetFunctionValue = childrenPopulationTargetFunVals[i];
 			for (unsigned int j = 0; j < chromosomeLength; j++)
 			{
-				bestSolution[j] = childrenPopulation[i][j];
+				bestSolution[j] = newBestChildInChildrenPopulation[j];
 			}
 		}
 	}
@@ -689,6 +845,7 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 
 template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::solveWithNGenerations(unsigned int generationsCount, bool verbose)
 {
+	copyMatrixToTargetFunctionArray(matrixBeforeOptimization);
 	if (!verbose)
 	{
 		for (unsigned int i = 0; i < generationsCount; i++)
@@ -738,14 +895,14 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 
 template <typename GeneField, typename MatrixField> MatrixField** MatrixGeneticAlgorithm<GeneField, MatrixField>::getCurrentBestSolution()
 {
-	MatrixField solVal = targetFunctionValueNoHalf(bestSolution);
+	decodeMatrix(bestSolution);
 	MatrixField** decodedMatrix = new MatrixField * [matrixSize];
 	for (unsigned int i = 0u; i < matrixSize; i++)
 	{
 		decodedMatrix[i] = new MatrixField[matrixSize];
 		for (unsigned int j = 0u; j < matrixSize; j++)
 		{
-			decodedMatrix[i][j] = matrixCopyForFitnessEvaluation[i + 1u][j + 1u];
+			decodedMatrix[i][j] = matrixCopyForFitnessEvaluation[ matrixCopyHashingRowsArray[i] + 1u][matrixCopyHashingColsArray[j] + 1u];
 		}
 	}
 	return decodedMatrix;

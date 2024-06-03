@@ -8,6 +8,8 @@
 #include <algorithm> 
 #include <stdexcept>
 #include <iomanip>
+#include <string>
+#include <fstream>
 template <typename GeneField, typename MatrixField> class MatrixGeneticAlgorithm
 {
 private:
@@ -91,10 +93,10 @@ private:
 	void setDecodingArrayValue(GeneField geneValue, unsigned int from, unsigned int to);
 	GeneField minimalColumnIndex();
 	GeneField genesCount;
-	
+	void saveSolutionPackageToFile(const std::string& solutionFolder, const std::string& matrixFileName, const std::string& targetFunctionValuesFileName);
 
 public:
-	void solveWithNGenerations(unsigned int generationsCount, bool verbose = false);
+	void solveWithNGenerations(unsigned int generationsCount, bool verbose, bool savePartialResults, std::string outputFolderPathEndingWithSlash);
 	
 	unsigned int* decodeWithArray(unsigned int* returnValueArray, GeneField geneValue);
 	MatrixGeneticAlgorithm(MatrixField** staringMatrix, unsigned int startingMatrixSize, double populationMatrSizePower,
@@ -877,10 +879,37 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 	//std::cout << "tournamentSelectionMiPlusLambda: selection done" << std::endl;
 }
 
-template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::solveWithNGenerations(unsigned int generationsCount, bool verbose)
+template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::saveSolutionPackageToFile(const std::string& solutionFolder, const std::string& matrixFileName, const std::string& targetFunctionValuesFileName)
+{
+	MatrixField** bestSol = getCurrentBestSolution();
+	std::ofstream outStream(solutionFolder + matrixFileName);
+	for (unsigned int i = 0u; i < matrixSize; i++)
+	{
+		for (unsigned int j = 0u; j < matrixSize; j++)
+		{
+			outStream << bestSol[i][j];
+			if (j < matrixSize - 1u)
+			{
+				outStream << "\t";
+			}
+			
+		}
+		outStream << "\n";
+		delete[] bestSol[i];
+	}
+	delete[] bestSol;
+	outStream.close();
+	outStream.open(solutionFolder + targetFunctionValuesFileName, std::ios::app);
+	outStream << std::fixed;
+	//outStream << std::dec;
+	outStream << std::setprecision(5)<<  getCurrentBestSolutionTargetFunctionValue() << "\n";
+	outStream.close();
+}
+
+template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::solveWithNGenerations(unsigned int generationsCount, bool verbose, bool savePartialResults, std::string outputFolderPathEndingWithSlash)
 {
 	copyMatrixToTargetFunctionArray(matrixBeforeOptimization);
-	if (!verbose)
+	if (!verbose && !savePartialResults)
 	{
 		for (unsigned int i = 0; i < generationsCount; i++)
 		{
@@ -900,10 +929,13 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 
 		std::ios_base::fmtflags flagsBefore{ std::cout.flags() };
 		std::cout << std::fixed;
-		std::cout << std::dec;
+		//std::cout << std::dec;
 		
-		
-		std::cout << "Starting evolution process" << std::endl;
+		if (verbose)
+		{
+			std::cout << "Starting evolution process" << std::endl;
+		}
+		unsigned int reminder_file_idx = 0u;
 		for (unsigned int i = 0u; i < intervalsCount; i++)
 		{
 			for (unsigned int j = 0u; j < generationsInterval; j++)
@@ -911,18 +943,34 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 				generateChildrenPopulation();
 				tournamentSelectionMiPlusLambda();
 			}
-			std::cout << i + 1 << ":\t generated " << (i + 1) * generationsInterval << "\t\t generations(" << std::setprecision(2) << (10000.0 * static_cast<double>((i + 1) * generationsInterval) / static_cast<double>(generationsCount)) * 0.01 << "%) target function value: \t"<<std::setprecision(5)<< getCurrentBestSolutionTargetFunctionValue() << std::endl;
+			if (verbose)
+			{
+				std::cout << i + 1 << ":\t generated " << (i + 1) * generationsInterval << "\t\t generations(" << std::setprecision(2) << (10000.0 * static_cast<double>((i + 1) * generationsInterval) / static_cast<double>(generationsCount)) * 0.01 << "%) target function value: \t" << std::setprecision(5) << getCurrentBestSolutionTargetFunctionValue() << std::endl;
+			}
+			if (savePartialResults)
+			{
+				saveSolutionPackageToFile(outputFolderPathEndingWithSlash, std::string("solution_" + std::to_string(i) + ".txt"), "target_fun_vals_for_intermediate_solutions.txt");
+			}
+			reminder_file_idx++;
 		}
 		for (unsigned int i = 0u; i <generationsReminder; i++)
 		{
 			generateChildrenPopulation();
 			tournamentSelectionMiPlusLambda();
 		}
-		if (generationsReminder > 0u)
+		if (generationsReminder > 0u && verbose)
 		{
 			std::cout << intervalsCount + 1 << ":\t generated " << intervalsCount * generationsInterval + generationsReminder<< "\t\t generations(" << std::setprecision(2) << (10000.0 * static_cast<double>(intervalsCount * generationsInterval + generationsReminder) / static_cast<double>(generationsCount)) * 0.01 << "%) target function value: \t" << std::setprecision(5) << getCurrentBestSolutionTargetFunctionValue() << std::endl;
+			
 		}
-		std::cout << "Evolution process done" << std::endl;
+		if (generationsReminder > 0u && savePartialResults)
+		{
+			saveSolutionPackageToFile(outputFolderPathEndingWithSlash, std::string("solution_" + std::to_string(reminder_file_idx) + ".txt"), "target_fun_vals_for_intermediate_solutions.txt");
+		}
+		if (verbose)
+		{
+			std::cout << "Evolution process done" << std::endl;
+		}
 		std::cout.setf(flagsBefore, std::ios::floatfield);
 	}
 }

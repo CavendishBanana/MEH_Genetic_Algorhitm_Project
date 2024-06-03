@@ -148,7 +148,7 @@ void appendLineToFile(std::string filePath, std::string line, bool appendReturnA
 int main()
 {
     
-    std::string outputFolderPathEndingWithSlash = "C:\\Users\\krzys\\OneDrive\\Desktop\\studia_2_st\\semestr_4\\meh\\projekt\\solverOutput";
+    std::string outputFolderPathEndingWithSlash = "C:\\Users\\krzys\\OneDrive\\Desktop\\studia_2_st\\semestr_4\\meh\\projekt\\solverOutput\\";
 
     default_random_engine engine;
     uniform_int_distribution<int> distribution = uniform_int_distribution<int>(-100, 100);
@@ -166,15 +166,17 @@ int main()
     }
 
     printMatrix(matrix, matrixSize);
+    saveMatrixToFile(matrix, matrixSize, outputFolderPathEndingWithSlash + "unoptimized_matrix.txt");
     cout << "===========================================================================================" << endl;
     MatrixGeneticAlgorithm<unsigned short, MatrixFieldType> geneticAlgorithmSolver = MatrixGeneticAlgorithm<unsigned short, MatrixFieldType>(matrix, matrixSize, 2.0, 15.0, 1.5, 2.0, engine, 0.95, 0.07, 4, 10, 0.2, 0.7);
     
     double startingTargetValue = geneticAlgorithmSolver.getTargetFunctionValueForPassedMatrix(matrix);
     cout << "Target value before optimization: " << startingTargetValue << endl;
-    appendLineToFile(outputFolderPathEndingWithSlash + "target_fun_vals.txt", "before: " + std::to_string(startingTargetValue));
+    appendLineToFile(outputFolderPathEndingWithSlash + "target_fun_vals_before_after.txt", "before: " + std::to_string(startingTargetValue));
     geneticAlgorithmSolver.useUniformCrossoverInGeneratingChildrenPopulation();
+    geneticAlgorithmSolver.useInversionMutation();
     unsigned int generationsCount = 20000;
-    geneticAlgorithmSolver.solveWithNGenerations(generationsCount, true);
+    geneticAlgorithmSolver.solveWithNGenerations(generationsCount, true, true, outputFolderPathEndingWithSlash);
 
     MatrixFieldType** optimizedMatrix = geneticAlgorithmSolver.getCurrentBestSolution();
     double targetValueForPassedOptimizedMatrix = geneticAlgorithmSolver.getTargetFunctionValueForPassedMatrix(optimizedMatrix);
@@ -189,8 +191,8 @@ int main()
     cout << "===========================================================================================" << endl;
     cout << "Optimized matrix:" << endl;
     printMatrix(optimizedMatrix, matrixSize);
-    saveMatrixToFile(optimizedMatrix, matrixSize, outputFolderPathEndingWithSlash + "matrix_optimized_mnpuc_avm.txt");
-    appendLineToFile(outputFolderPathEndingWithSlash + "target_fun_vals.txt", "after: " + std::to_string(targetValueForBestSolutionRememberedBySolver));
+    saveMatrixToFile(optimizedMatrix, matrixSize, outputFolderPathEndingWithSlash + "optimized_matrix.txt");
+    appendLineToFile(outputFolderPathEndingWithSlash + "target_fun_vals_before_after.txt", "after: " + std::to_string(targetValueForBestSolutionRememberedBySolver));
     //cout << "optimized matrix - get target function value by passing array: " << geneticAlgorithmSolver.getTargetFunctionValueForPassedMatrix(optimizedMatrix) << endl;
     for (unsigned int i = 0; i < matrixSize; i++)
     {

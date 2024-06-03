@@ -424,7 +424,7 @@ template <typename GeneField, typename MatrixField> void  MatrixGeneticAlgorithm
 template <typename GeneField, typename MatrixField> void  MatrixGeneticAlgorithm<GeneField, MatrixField>::decodeMatrix(GeneField* solution)
 {
 	unsigned int swapArray[2];
-	GeneField minColumnSwapIdx = minimalColumnIndex();
+	//GeneField minColumnSwapIdx = minimalColumnIndex();
 	for (unsigned int i = 0u; i < matrixSize; i++)
 	{
 		matrixCopyHashingRowsArray[i] = i;
@@ -441,7 +441,7 @@ template <typename GeneField, typename MatrixField> void  MatrixGeneticAlgorithm
 	for (unsigned int i = halfChromosomeLength; i < chromosomeLength; i++)
 	{
 		decodeWithArray(swapArray, solution[i]);
-		unsigned int tmp = matrixCopyHashingRowsArray[swapArray[0u]];
+		unsigned int tmp = matrixCopyHashingColsArray[swapArray[0u]];
 		matrixCopyHashingColsArray[swapArray[0u]] = matrixCopyHashingColsArray[swapArray[1u]];
 		matrixCopyHashingColsArray[swapArray[1u]] = tmp;
 	}

@@ -167,7 +167,7 @@ int main()
 
     printMatrix(matrix, matrixSize);
     cout << "===========================================================================================" << endl;
-    MatrixGeneticAlgorithm<unsigned short, MatrixFieldType> geneticAlgorithmSolver = MatrixGeneticAlgorithm<unsigned short, MatrixFieldType>(matrix, matrixSize, 2.0, 15.0, 1.5, 2.0, engine, 0.95, 0.07, 4, 10, 0.2);
+    MatrixGeneticAlgorithm<unsigned short, MatrixFieldType> geneticAlgorithmSolver = MatrixGeneticAlgorithm<unsigned short, MatrixFieldType>(matrix, matrixSize, 2.0, 15.0, 1.5, 2.0, engine, 0.95, 0.07, 4, 10, 0.2, 0.7);
     
     double startingTargetValue = geneticAlgorithmSolver.getTargetFunctionValueForPassedMatrix(matrix);
     cout << "Target value before optimization: " << startingTargetValue << endl;

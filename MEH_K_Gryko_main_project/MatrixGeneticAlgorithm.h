@@ -35,9 +35,10 @@ private:
 	unsigned int halfChromosomeLength;
 	unsigned int* decodingArray;
 	double crossoverProbability, mutationProbability;
+	double alteringInversionMixedMutationAlteringPrefference;
 
 	void (MatrixGeneticAlgorithm<GeneField, MatrixField>::*crossoverOperationFunctionPointer)(GeneField* parent1, GeneField* parent2, GeneField* child1, GeneField* child2);
-
+	void (MatrixGeneticAlgorithm<GeneField, MatrixField>::* mutationOperationFunctionPointer)(GeneField* specimen);
 
 	GeneField decodingArrayRealSize;
 	//const GeneField geneFieldOne;
@@ -79,6 +80,7 @@ private:
 	void nPointUniformMixedCrossover(GeneField* parent1, GeneField* parent2, GeneField* child1, GeneField* child2);
 	void mutationByInversion(GeneField* specimen);
 	void mutationByAlteringGeneValue(GeneField* specimen);
+	void alteringValueAndInversionMixedMutation(GeneField* specimen);
 	void findParamsForAlteringMutation(unsigned int runsCount = 10000000u);
 	void findParamsForNPointCrossover();
 	unsigned int findBestSolutionIndexInArray(MatrixField* targetFunctionValues, unsigned int targetFunValsArrayLength);
@@ -98,7 +100,7 @@ public:
 	MatrixGeneticAlgorithm(MatrixField** staringMatrix, unsigned int startingMatrixSize, double populationMatrSizePower,
 		double populationSizeMultiplier, double chromesomeLenMatrSizePower, double chromosomeSizeMultplier, 
 		std::default_random_engine& randomEngine, double crossoverProbability, double mutationProbability, 
-		unsigned int tournamentGroupSize, unsigned int nPointCrossoverSplitsCount, double mixedCrossoverNPointUniformThreshold);
+		unsigned int tournamentGroupSize, unsigned int nPointCrossoverSplitsCount, double mixedCrossoverNPointUniformThreshold, double mixedAltInvMutationAlterPrefference);
 	~MatrixGeneticAlgorithm();
 	double targetFunctionValue(GeneField* solution);
 	double getCurrentBestSolutionTargetFunctionValue();
@@ -108,6 +110,9 @@ public:
 	void useNPointCrossoverInGeneratingChildrenPopulation();
 	void useUniformCrossoverInGeneratingChildrenPopulation();
 	void useNPointUniformMixedCrossoverInGeneratingChildrenPopulation();
+	void useAlteringValueMtuation();
+	void useInversionMutation();
+	void useMixedMutation();
 };
 
 template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::crossoverUniform(GeneField* parent1, GeneField* parent2, GeneField* child1, GeneField* child2)
@@ -148,6 +153,19 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::useNPointUniformMixedCrossoverInGeneratingChildrenPopulation()
 {
 	crossoverOperationFunctionPointer = &MatrixGeneticAlgorithm<GeneField, MatrixField>::nPointUniformMixedCrossover;
+}
+
+template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::useAlteringValueMtuation()
+{
+	mutationOperationFunctionPointer = &MatrixGeneticAlgorithm<GeneField, MatrixField>::mutationByAlteringGeneValue;
+}
+template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::useInversionMutation()
+{
+	mutationOperationFunctionPointer = &MatrixGeneticAlgorithm<GeneField, MatrixField>::mutationByInversion;
+}
+template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::useMixedMutation()
+{
+	mutationOperationFunctionPointer = &MatrixGeneticAlgorithm<GeneField, MatrixField>::alteringValueAndInversionMixedMutation;
 }
 
 
@@ -250,6 +268,20 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 	}
 }
 
+template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::alteringValueAndInversionMixedMutation(GeneField* specimen)
+{
+	std::uniform_real_distribution<double> mutationTypeChoice(0.0, 1.0);
+	if (mutationTypeChoice(randomEngine) < alteringInversionMixedMutationAlteringPrefference)
+	{
+		mutationByAlteringGeneValue(specimen);
+	}
+	else
+	{
+		mutationByInversion(specimen);
+	}
+
+}
+
 template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<GeneField, MatrixField>::findParamsForAlteringMutation(unsigned int runsCount)
 {
 	std::normal_distribution<double> distrNormal = std::normal_distribution<double>(0.0, static_cast<double>(matrixSize));
@@ -349,7 +381,7 @@ template <typename GeneField, typename MatrixField> MatrixGeneticAlgorithm<GeneF
 	MatrixField** staringMatrix, unsigned int startingMatrixSize, double populationMatrSizePower,
 	double populationSizeMultiplier, double chromesomeLenMatrSizePower, double chromosomeSizeMultplier, 
 	std::default_random_engine& randomEngine, double crossoverProbability, double mutationProbability, 
-	unsigned int tournamentGroupSize, unsigned int nPointCrossoverSplitsCount, double mixedCrossoverNPointUniformThreshold) :
+	unsigned int tournamentGroupSize, unsigned int nPointCrossoverSplitsCount, double mixedCrossoverNPointUniformThreshold, double alteringInversionMixedMutationAlteringPrefference) :
 	//geneFieldOne(static_cast<GeneField>(1u)),
 	//geneFieldTwo(static_cast<GeneField>(2u)),
 	//geneFieldZero(static_cast<GeneField>(0u)),
@@ -366,7 +398,8 @@ template <typename GeneField, typename MatrixField> MatrixGeneticAlgorithm<GeneF
 	tournamentGroupSize(tournamentGroupSize),
 	genesCount((static_cast<GeneField>(startingMatrixSize)* (static_cast<GeneField>(startingMatrixSize) - MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldOne())) / MatrixGeneticAlgorithm<GeneField, MatrixField>::getGeneFieldTwo() ),
 	nPointCrossoverTotalSplitsCount(nPointCrossoverSplitsCount),
-	mixedCrossoverNPointUniformThreshold(mixedCrossoverNPointUniformThreshold)
+	mixedCrossoverNPointUniformThreshold(mixedCrossoverNPointUniformThreshold),
+	alteringInversionMixedMutationAlteringPrefference(alteringInversionMixedMutationAlteringPrefference)
 {
 	//constructor body start
 	//std::cout << "Constructor starts working, chromosome length: "<<chromosomeLength << std::endl;
@@ -406,7 +439,7 @@ template <typename GeneField, typename MatrixField> MatrixGeneticAlgorithm<GeneF
 	generateStartingPopulation(populationMatrSizePower, populationSizeMultiplier);
 	
 	crossoverOperationFunctionPointer = &MatrixGeneticAlgorithm<GeneField, MatrixField>::crossoverNPoint;
-
+	mutationOperationFunctionPointer = &MatrixGeneticAlgorithm<GeneField, MatrixField>::mutationByAlteringGeneValue;
 	//std::cout << "Constructor finished work" << std::endl;
 }
 
@@ -726,7 +759,8 @@ template <typename GeneField, typename MatrixField> void MatrixGeneticAlgorithm<
 		if (geneticOperatorsProbabilityGenerator(randomEngine) <= mutationProbability)
 		{
 			//mutationByInversion(childrenPopulation[i]);
-			mutationByAlteringGeneValue(childrenPopulation[i]);
+			//mutationByAlteringGeneValue(childrenPopulation[i]);
+			(this->*mutationOperationFunctionPointer)(childrenPopulation[i]);
 		}
 		childrenPopulationTargetFunVals[i] = targetFunctionValueNoHalf(childrenPopulation[i]);
 		//check if child is better than best solution
